@@ -1,4 +1,4 @@
-use actix_web::{delete, get, post, put, web, HttpResponse, Responder};
+use actix_web::{delete, get, post, put, web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -9,7 +9,7 @@ pub struct TodoRequest {
     complete: bool,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Todo {
     id: Uuid,
     task: String,
@@ -17,59 +17,46 @@ pub struct Todo {
 }
 
 #[get("")]
-pub async fn get_todos(pool: web::Data<PgPool>) -> impl Responder {
-    match sqlx::query!(r#"SELECT id, task, complete FROM todo"#)
+pub async fn get_todos(pool: web::Data<PgPool>) -> HttpResponse {
+    match sqlx::query_as!(Todo, "SELECT id, task, complete FROM todo")
         .fetch_all(pool.as_ref())
         .await
     {
-        Ok(todos) => {
-            println!("GET todos {:?}", todos);
-            HttpResponse::Ok()
-        }
-        Err(_) => HttpResponse::InternalServerError(),
+        Ok(todos) => HttpResponse::Ok().json(todos),
+        Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }
 
 #[get("/{id}")]
-pub async fn get_todo(id: web::Path<String>, pool: web::Data<PgPool>) -> impl Responder {
-    let uuid = match Uuid::parse_str(id.as_str()) {
-        Ok(uuid) => uuid,
-        Err(_) => return HttpResponse::InternalServerError(),
-    };
-
-    match sqlx::query!(
-        r#"
-        SELECT id, task, complete 
-        FROM todo
-        WHERE id = $1
-        "#,
-        uuid
+pub async fn get_todo(id: web::Path<Uuid>, pool: web::Data<PgPool>) -> HttpResponse {
+    match sqlx::query_as!(
+        Todo,
+        "
+            SELECT id, task, complete 
+            FROM todo
+            WHERE id = $1
+        ",
+        id.into_inner()
     )
     .fetch_one(pool.as_ref())
     .await
     {
-        Ok(rec) => {
-            let todo = Todo {
-                id: rec.id,
-                task: rec.task,
-                complete: rec.complete,
-            };
-            println!("GET todo {:?}", todo);
-            HttpResponse::Ok()
-        }
-        Err(_) => HttpResponse::InternalServerError(),
+        Ok(todo) => HttpResponse::Ok().json(todo),
+        Err(e) => match e {
+            sqlx::Error::RowNotFound => HttpResponse::NotFound().finish(),
+            _ => HttpResponse::InternalServerError().finish(),
+        },
     }
 }
 
 #[post("")]
-pub async fn create_todo(todo: web::Json<TodoRequest>, pool: web::Data<PgPool>) -> impl Responder {
-    match sqlx::query!(
+pub async fn create_todo(todo: web::Json<TodoRequest>, pool: web::Data<PgPool>) -> HttpResponse {
+    match sqlx::query_as!(
+        Todo,
         r#"
-        INSERT INTO todo
-            (id, task, complete)
-        VALUES
-            ($1, $2, $3)
-        RETURNING id
+            INSERT INTO todo (id, task, complete)
+            VALUES ($1, $2, $3)
+            RETURNING id, task, complete
         "#,
         Uuid::new_v4(),
         todo.task,
@@ -78,17 +65,58 @@ pub async fn create_todo(todo: web::Json<TodoRequest>, pool: web::Data<PgPool>) 
     .fetch_one(pool.as_ref())
     .await
     {
-        Ok(_) => HttpResponse::Created(),
-        Err(_) => HttpResponse::InternalServerError(),
+        Ok(todo) => HttpResponse::Created().json(todo),
+        Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }
 
-#[put("")]
-pub async fn update_todo() -> impl Responder {
-    HttpResponse::Ok()
+#[put("/{id}")]
+pub async fn update_todo(
+    id: web::Path<Uuid>,
+    todo: web::Json<TodoRequest>,
+    pool: web::Data<PgPool>,
+) -> HttpResponse {
+    match sqlx::query_as!(
+        Todo,
+        r#"
+            UPDATE todo
+            SET task = $1, complete = $2
+            WHERE id = $3
+            RETURNING id, task, complete
+        "#,
+        todo.task,
+        todo.complete,
+        id.into_inner()
+    )
+    .fetch_one(pool.as_ref())
+    .await
+    {
+        Ok(todo) => HttpResponse::Ok().json(todo),
+        Err(e) => match e {
+            sqlx::Error::RowNotFound => HttpResponse::NotFound().finish(),
+            _ => HttpResponse::InternalServerError().finish(),
+        },
+    }
 }
 
-#[delete("")]
-pub async fn delete_todo() -> impl Responder {
-    HttpResponse::Ok()
+#[delete("/{id}")]
+pub async fn delete_todo(id: web::Path<Uuid>, pool: web::Data<PgPool>) -> HttpResponse {
+    match sqlx::query_as!(
+        Todo,
+        r#"
+            DELETE FROM todo
+            WHERE id = $1
+            RETURNING id, task, complete
+        "#,
+        id.into_inner()
+    )
+    .fetch_one(pool.as_ref())
+    .await
+    {
+        Ok(todo) => HttpResponse::Ok().json(todo),
+        Err(e) => match e {
+            sqlx::Error::RowNotFound => HttpResponse::NotFound().finish(),
+            _ => HttpResponse::InternalServerError().finish(),
+        },
+    }
 }
