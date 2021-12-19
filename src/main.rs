@@ -1,6 +1,6 @@
-use todo::api::run;
+use todo::startup_todo_api;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    run()?.await
+    startup_todo_api()?.await
 }
