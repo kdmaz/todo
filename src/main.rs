@@ -1,11 +1,18 @@
 use sqlx::PgPool;
-use todo::startup_todo_api;
+use std::net::TcpListener;
+use todo::{configuration::get_configuration, startup_todo_api};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let pool = PgPool::connect("postgres://postgres:postgres@localhost:5432/todo_db")
+    let configuration = get_configuration().expect("Failed to get configuration");
+
+    let connection_string = configuration.database.connection_string();
+    let pool = PgPool::connect(&connection_string)
         .await
         .expect("Could not connect to postgres.");
 
-    startup_todo_api(pool)?.await
+    let address = format!("127.0.0.1:{}", configuration.application_port);
+    let listener = TcpListener::bind(address)?;
+
+    startup_todo_api(listener, pool)?.await
 }
