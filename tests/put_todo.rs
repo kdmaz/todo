@@ -1,6 +1,7 @@
 mod utils;
 use crate::utils::insert_todos;
 use serde_json::json;
+use todo::Todo;
 use utils::spawn_app;
 
 #[actix_rt::test]
@@ -47,6 +48,8 @@ async fn put_todo() {
 
         assert!(response.status().is_success());
         let body = response.text().await.expect("Failed to get body");
+        let todo_response = serde_json::from_str(body.as_str())
+            .expect("Failed to get Todo from JSON response body");
         assert_eq!(
             body,
             json!(
@@ -58,6 +61,16 @@ async fn put_todo() {
             )
             .to_string()
         );
+
+        let saved_todo = sqlx::query_as!(
+            Todo,
+            "SELECT id, task, complete FROM todo WHERE id = '11111111-1111-1111-1111-111111111111'"
+        )
+        .fetch_one(&test_app.pool)
+        .await
+        .expect("Failed to fetch saved todo");
+
+        assert_eq!(saved_todo, todo_response);
     })
     .await;
 }
