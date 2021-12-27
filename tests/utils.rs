@@ -67,3 +67,28 @@ async fn cleanup(db_config: &DatabaseConfig, pool: PgPool) {
         .await
         .expect(format!("Failed to drop database {}", db_config.db_name).as_str());
 }
+
+pub async fn insert_todos(pool: &PgPool) {
+    sqlx::query!(
+        "INSERT INTO todo (id, task, complete)
+        VALUES 
+        (
+            '00000000-0000-0000-0000-000000000000',
+            'task 1',
+            true
+        ),
+        (
+            '11111111-1111-1111-1111-111111111111',
+            'task 2',
+            false
+        ),
+        (
+            '22222222-2222-2222-2222-222222222222',
+            'task 3',
+            true
+        )"
+    )
+    .execute(pool)
+    .await
+    .expect("Failed to insert todos");
+}
