@@ -9,11 +9,11 @@ pub struct TodoRequest {
     complete: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Todo {
-    id: Uuid,
-    task: String,
-    complete: bool,
+    pub id: Uuid,
+    pub task: String,
+    pub complete: bool,
 }
 
 #[get("")]
