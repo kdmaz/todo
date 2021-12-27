@@ -158,7 +158,10 @@ async fn put_todo_bad_uuid() {
         let client = reqwest::Client::new();
         let response = client
             .put(&format!("{}/api/todos/bad-uuid", &test_app.address))
-            .body(r#"{"task":"updated task","complete":true}"#)
+            .json(&json!({
+                "task": "updated task",
+                "complete": true
+            }))
             .send()
             .await
             .expect("Failed to execute request to get todos");
@@ -179,7 +182,10 @@ async fn put_todo_404() {
                 "{}/api/todos/44444444-4444-4444-4444-444444444444",
                 &test_app.address
             ))
-            .body(r#"{"task":"updated task","complete":true}"#)
+            .json(&json!({
+                "task": "updated task",
+                "complete": true
+            }))
             .send()
             .await
             .expect("Failed to execute request to get todos");
@@ -190,34 +196,37 @@ async fn put_todo_404() {
     .await;
 }
 
-// #[actix_rt::test]
-// async fn put_todo() {
-//     spawn_app(|test_app| async move {
-//         insert_todos(&test_app.pool).await;
-//         let client = reqwest::Client::new();
-//         let response = client
-//             .put(&format!(
-//                 "{}/api/todos/11111111-1111-1111-1111-111111111111",
-//                 &test_app.address
-//             ))
-//             .body(r#"{"task":"updated task","complete":true}"#)
-//             .send()
-//             .await
-//             .expect("Failed to execute request to get todos");
+#[actix_rt::test]
+async fn put_todo() {
+    spawn_app(|test_app| async move {
+        insert_todos(&test_app.pool).await;
+        let client = reqwest::Client::new();
+        let response = client
+            .put(&format!(
+                "{}/api/todos/11111111-1111-1111-1111-111111111111",
+                &test_app.address
+            ))
+            .json(&json!({
+                "task": "updated task",
+                "complete": true
+            }))
+            .send()
+            .await
+            .expect("Failed to execute request to get todos");
 
-//         assert!(response.status().is_success());
-//         let body = response.text().await.expect("Failed to get body");
-//         assert_eq!(
-//             body,
-//             json!(
-//                 {
-//                     "id": "11111111-1111-1111-1111-111111111111",
-//                     "task": "updated task",
-//                     "complete": true
-//                 }
-//             )
-//             .to_string()
-//         );
-//     })
-//     .await;
-// }
+        assert!(response.status().is_success());
+        let body = response.text().await.expect("Failed to get body");
+        assert_eq!(
+            body,
+            json!(
+                {
+                    "id": "11111111-1111-1111-1111-111111111111",
+                    "task": "updated task",
+                    "complete": true
+                }
+            )
+            .to_string()
+        );
+    })
+    .await;
+}
